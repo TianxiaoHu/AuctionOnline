@@ -1,32 +1,28 @@
 # -*- coding:utf-8 -*-
-'''
-/msg [bidderID ]
-群发和向指定用户发送消息，用以某些提示。
-/list auctionName
-列出某竞拍室中参加竞拍者的情况。
-/kickout bidderID
-将某竞拍者踢出游戏，以防止一些捣乱的竞拍者，如长时间不拍卖。并且向参加该棋局中的对方竞拍者发送踢出的消息。
-/opennewauction  auctionName  price
-开通新的竞拍室，每个竞拍室只有一件商品, 该商品具有一定的起拍价
-/auctions
-列出当前正在进行竞拍的竞拍室。
-/enter auctionName
-可以观看某一竞拍室的竞拍情况，可以/list，/kickout bidderID命令。直到使用leave命令离开该竞拍室。
-/close auctionName
-关闭某一竞拍室。
-
-服务器除了支持这些命令，最好在竞拍的过程中，增加拍卖所必须的功能，
-比如实时对参与某一拍品的所有竞拍者广播最新的竞拍价格，及出价者；
-要能判断何时结束某一商品的拍卖，最终的拍卖价格，以及拍品所得者。
-'''
-
 import sys
 import socket
 import threading
 
+global server
 global AuctionRoom, User, AddMapID, IDMapAdd
 AuctionRoom, User = [], []
 AddMapID, IDMapAdd = {}, {}
+
+def user_map_auctions(UserID):
+		for room in AuctionRoom:
+			if UserID in room.bidder:
+				return room
+		else:
+			print UserID, 'not in any room'
+			sys.stdout.flush()
+
+def name_map_auctions(auction_name):
+	for room in AuctionRoom:
+		if room.name == auction_name:
+			return room
+	else:
+		print auction_name, 'not exist.'
+		sys.stdout.flush()
 
 
 class Room():
@@ -35,7 +31,8 @@ class Room():
 		self.name = name
 		self.bidder = []
 		self.history = []
-		self.highest_price = price
+		self.highest_price = float(price)
+		self.highest_user = ''
 
 	def add_bidder(self, bidder_ID):
 		if bidder_ID not in self.bidder:
@@ -54,10 +51,14 @@ class Room():
 			sys.stdout.flush()
 			return False
 		else:
-			self.bidder.remove(bidder_ID)
-			print bidder_ID, 'exit from', self.name
-			sys.stdout.flush()
-			return True
+			if self.highest_user != '' and bidder_ID == self.highest_user:
+				print bidder_ID, 'bid the highest price!'
+				return False
+			else:
+				self.bidder.remove(bidder_ID)
+				print bidder_ID, 'leave from', self.name
+				sys.stdout.flush()
+				return True
 
 	def draw_bid_history(self):
 		return self.history
@@ -76,11 +77,11 @@ class Room():
 		else:
 			self.highest_price = price
 			self.highest_user = UserID
-			self.history.append(UserID + str(price))
+			self.history.append(UserID + ' bid ' + str(price))
 			return True
 
 
-class Listener:
+class Server():
 
 	def __init__(self, local_port=20210):
 
@@ -89,11 +90,11 @@ class Listener:
 			local_address = (local_IP, local_port)
 			self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 			self.s.bind(local_address)
-			print 'Lisenter Initialized!'
+			print 'AuctionOnline Server Initialized!'
 			sys.stdout.flush()
 
 		except:
-			print 'Fail to create Listener UDP socket...'
+			print 'Fail to create Server UDP socket...'
 			sys.stdout.flush()
 			sys.exit()
 
@@ -116,14 +117,6 @@ class Listener:
 		print 'Broadcasting ended!'
 		sys.stdout.flush()
 
-	def user_map_auctions(self, UserID):
-		for room in AuctionRoom:
-			if UserID in room.bidder:
-				return room
-		else:
-			print UserID, 'not in any room'
-			sys.stdout.flush()
-
 	def deal_client_command(self, message, address):
 		fields = message.split(' ')
 		if fields[0] in ['/login', '/auctions', '/list', '/join', '/bid', '/leave',
@@ -131,8 +124,7 @@ class Listener:
 			if fields[0] == '/login':
 				try:
 					if fields[1] in User:
-						self.send_message(
-							'Username occupied, try another..', address)
+						self.send_message('Username occupied, try another..', address)
 					else:
 						User.append(fields[1])
 						IDMapAdd[fields[1]] = address
@@ -140,8 +132,7 @@ class Listener:
 						print fields[1], 'logged in from', address
 						sys.stdout.flush()
 				except:
-					self.send_message(
-						'Invalid input! Type \'help\' for help..', address)
+					self.send_message('Invalid input! Type \'help\' for help..', address)
 
 			if fields[0] == '/auctions':
 				self.send_message('Next are available auction rooms:', address)
@@ -149,10 +140,18 @@ class Listener:
 					self.send_message(room.name, address)
 
 			if fields[0] == '/list':
-				room = self.user_map_auctions(AddMapID[address])
-				roomhistory = room.draw_bid_history()
-				for bidhistory in roomhistory:
-					self.send_message(bidhistory, address)
+				try:
+					room = user_map_auctions(AddMapID[address])
+					roomhistory = room.draw_bid_history()
+					if len(roomhistory) == 0:
+						self.send_message('No bid history..', address)
+					else:
+						for bidhistory in roomhistory:
+							self.send_message(bidhistory, address)
+				except:
+					print AddMapID[address], 'haven\'t join a room..'
+					sys.stdout.flush()
+					self.send_message('You must join a room first..', address)
 
 			if fields[0] == '/join':
 				try:
@@ -160,39 +159,30 @@ class Listener:
 						if fields[1] == room.name:
 							if room.add_bidder(AddMapID[address]):
 								broadcast_message = AddMapID[
-									address] + 'joined auction!'
-								broadcast_address = room.draw_bidder_address
-								room.broadcast(
-									broadcast_message, broadcast_address)
+									address] + ' joined auction!'
+								broadcast_address = room.draw_bidder_address()
+								if len(broadcast_address) != 0:
+									self.broadcast(broadcast_message, broadcast_address)
 							else:
-								self.send_message(
-									'You have already in this room', address)
+								self.send_message('You have already in this room', address)
 							break
 					else:
 						self.send_message('No this room..try another', address)
 				except:
-					self.send_message(
-						'Invalid input! Type \'help\' for help..', address)
+					self.send_message('Invalid input! Type \'help\' for help..', address)
 
 			if fields[0] == '/bid':
 				try:
-					for room in AuctionRoom:
-						if AddMapID[address] in room.bidder:
-							if room.update_bid_info(AddMapID[address], float(fields[1])):
-								broadcast_message = AddMapID[
-									address] + fields[1]
-								broadcast_address = room.draw_bidder_address
-								room.broadcast(
-									broadcast_message, broadcast_address)
-								break
-							else:
-								self.send_message(
-									'Your price must higher than history!', address)
+					room = user_map_auctions(AddMapID[address])
+					if room.update_bid_info(AddMapID[address], float(fields[1])):
+						broadcast_message = AddMapID[address] + ' bid ' + fields[1]
+						broadcast_address = room.draw_bidder_address()
+						if len(broadcast_address) != 0:
+							self.broadcast(broadcast_message, broadcast_address)
 					else:
-						self.send_message('Enter a room first..', address)
+						self.send_message('Your price must higher than history!', address)
 				except:
-					self.send_message(
-						'Invalid input! Type \'help\' for help..', address)
+					self.send_message('Enter a room first..', address)
 
 			if fields[0] == '/leave':
 				for room in AuctionRoom:
@@ -200,10 +190,10 @@ class Listener:
 						if room.remove_bidder(AddMapID[address]):
 							self.send_message('You have left..', address)
 							broadcast_message = AddMapID[
-								address] + 'has left..'
-							broadcast_address = room.draw_bidder_address
-							room.broadcast(
-								broadcast_message, broadcast_address)
+								address] + ' has left..'
+							broadcast_address = room.draw_bidder_address()
+							if len(broadcast_address) != 0:
+								self.broadcast(broadcast_message, broadcast_address)
 						else:
 							self.send_message('You can\'t leave now!', address)
 						break
@@ -216,14 +206,15 @@ class Listener:
 						if room.remove_bidder(AddMapID[address]):
 							self.send_message('You have left..', address)
 							broadcast_message = AddMapID[
-								address] + 'has left..'
-							broadcast_address = room.draw_bidder_address
-							room.broadcast(
-								broadcast_message, broadcast_address)
+								address] + ' has left..'
+							broadcast_address = room.draw_bidder_address()
+							if len(broadcast_address) != 0:
+								self.broadcast(broadcast_message, broadcast_address)
 						else:
 							self.send_message('You can\'t leave now!', address)
 							break
 				else:
+					self.send_message('Successfully exit from AuctionOnline..', address)
 					print AddMapID[address], 'exit'
 					sys.stdout.flush()
 					User.remove(AddMapID[address])
@@ -231,61 +222,7 @@ class Listener:
 					AddMapID.pop(address)
 
 		else:
-			self.send_message(
-				'Invalid input! Type \'help\' for help..', address)
-
-
-class ListenerThread(threading.Thread):
-
-	def run(self):
-		listener = Listener()
-		while True:
-			data, address = listener.receive_message()
-			listener.deal_client_command(data, address)
-
-
-class Speaker:
-
-	def __init__(self, server_IP, server_port):
-		try:
-			self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-			print 'Speaker Initialized!'
-			sys.stdout.flush()
-		except:
-			print 'Fail to create Speaker UDP socket...'
-			sys.stdout.flush()
-			sys.exit()
-
-		self.server_address = (server_IP, server_port)
-
-	def send_message(self, message, address):
-		self.s.sendto(message, address)
-		print message, 'sent to', address
-		sys.stdout.flush()
-
-	def broadcast(self, message, client_addresses):
-		print 'Broadcasting...'
-		sys.stdout.flush()
-		for client_address in client_addresses:
-			self.send_message(message, client_address)
-		print 'Broadcasting ended!'
-		sys.stdout.flush()
-
-	def user_map_auctions(self, UserID):
-		for room in AuctionRoom:
-			if UserID in room.bidder:
-				return room
-		else:
-			print UserID, 'not in any room'
-			sys.stdout.flush()
-
-	def name_map_auctions(self, auction_name):
-		for room in AuctionRoom:
-			if room.name == auction_name:
-				return room
-		else:
-			print auction_name, 'not exist.'
-			sys.stdout.flush()
+			self.send_message('Invalid input! Type \'help\' for help..', address)
 
 	def deal_server_command(self, message):
 		fields = message.split(' ')
@@ -296,7 +233,7 @@ class Speaker:
 					try:
 						self.send_message(fields[1], IDMapAdd[user])
 					except:
-						print 'Fail to broadcast', fields[1], 'to', user
+						print 'Fail to send', fields[1], 'to', user
 						sys.stdout.flush()
 
 			if fields[0] == '/list':
@@ -307,15 +244,15 @@ class Speaker:
 
 			if fields[0] == '/kickout':
 				if fields[1] in User:
-					room = self.user_map_auctions(fields[1])
+					room = user_map_auctions(fields[1])
 					if room.remove_bidder(fields[1]):
 						print fields[1], 'kicked out!'
 						sys.stdout.flush()
-						self.send_message(
-							'You have been kicked out..', IDMapAdd[fields[1]])
-						broadcast_message = fields[1] + 'have been kicked out!'
-						broadcast_address = room.draw_bidder_address
-						room.broadcast(broadcast_message, broadcast_address)
+						self.send_message('You have been kicked out..', IDMapAdd[fields[1]])
+						broadcast_message = fields[1] + ' have been kicked out!'
+						broadcast_address = room.draw_bidder_address()
+						if len(broadcast_address) != 0:
+							self.broadcast(broadcast_message, broadcast_address)
 					else:
 						print fields[1], 'owns the highest price..'
 						sys.stdout.flush()
@@ -348,7 +285,7 @@ class Speaker:
 
 			if fields[0] == '/close':
 				try:
-					close_room = self.name_map_auctions(fields[1])
+					close_room = name_map_auctions(fields[1])
 					if len(close_room.bidder) != 0:
 						print 'Users in auction room, can\'t close now.'
 						sys.stdout.flush()
@@ -363,24 +300,25 @@ class Speaker:
 			sys.stdout.flush()
 
 
+class ListenerThread(threading.Thread):
+
+	def run(self):
+		while True:
+			data, address = server.receive_message()
+			server.deal_client_command(data, address)
+
+
 class SpeakerThread(threading.Thread):
 
 	def run(self):
-		local_IP = socket.gethostbyname(socket.gethostname())
-		speaker = Speaker(local_IP, 20209)
 		while True:
 			data = raw_input()
-			speaker.deal_server_command(data)
+			server.deal_server_command(data)
 
-
-class Server():
-
-	def run(self):
-		self.listener_thread = ListenerThread()
-		self.speaker_thread = SpeakerThread()
-		self.listener_thread.start()
-		self.speaker_thread.start()
+server = Server()
 
 if __name__ == '__main__':
-	server = Server()
-	server.run()
+	listener_thread = ListenerThread()
+	speaker_thread = SpeakerThread()
+	listener_thread.start()
+	speaker_thread.start()

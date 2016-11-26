@@ -7,6 +7,9 @@ global client
 ServerIP = socket.gethostbyname(socket.gethostname())
 ServerPort = 20210
 
+def show_tips():
+	pass
+
 class Client():
 	def __init__(self, server_IP, server_port):
 		try:
@@ -44,7 +47,10 @@ class SpeakerThread(threading.Thread):
 	def run(self):
 		while True:
 			data = raw_input()
-			client.send_message(data)
+			if data == 'help':
+				show_tips()
+			else:
+				client.send_message(data)
 
 client = Client(ServerIP, ServerPort)
 
