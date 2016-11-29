@@ -59,4 +59,5 @@
 - restart auction(Server)
 - reject the bid(Server)
 - extend `/kickout` kickout many users at the same time(Server)
+- Encryption of data——in case of MITM attack
 
