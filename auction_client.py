@@ -49,6 +49,19 @@ class SpeakerThread(threading.Thread):
 			data = raw_input()
 			if data == 'help':
 				show_tips()
+			elif data == '/pubmsg':
+				msg = raw_input('Input message here:(type q to quit)\n')
+				print msg
+				print type(msg)
+				if msg != 'q':
+					client.send_message('/pubmsg ' + msg)
+				else:
+					print 'Quitted'
+					sys.stdout.flush()
+			elif data == '/primsg':
+				pass
+				# TODO
+
 			else:
 				client.send_message(data)
 

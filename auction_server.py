@@ -9,12 +9,12 @@ AuctionRoom, User = [], []
 AddMapID, IDMapAdd = {}, {}
 
 def user_map_auctions(UserID):
-		for room in AuctionRoom:
-			if UserID in room.bidder:
-				return room
-		else:
-			print UserID, 'not in any room'
-			sys.stdout.flush()
+	for room in AuctionRoom:
+		if UserID in room.bidder:
+			return room
+	else:
+		print UserID, 'not in any room'
+		sys.stdout.flush()
 
 def name_map_auctions(auction_name):
 	for room in AuctionRoom:
@@ -24,15 +24,22 @@ def name_map_auctions(auction_name):
 		print auction_name, 'not exist.'
 		sys.stdout.flush()
 
+def user_exist(UserAddr):
+	if UserAddr in IDMapAdd.values():
+		return True
+	else:
+		return False
 
 class Room():
 
-	def __init__(self, name, price):
+	def __init__(self, name, baseprice, ceilprice, gap):
 		self.name = name
 		self.bidder = []
 		self.history = []
-		self.highest_price = float(price)
+		self.highest_price = float(baseprice)
 		self.highest_user = ''
+		self.ceiling = float(ceilprice)
+		self.gap = float(gap)
 
 	def add_bidder(self, bidder_ID):
 		if bidder_ID not in self.bidder:
@@ -69,16 +76,33 @@ class Room():
 			addresses.append(IDMapAdd[user])
 		return addresses
 
+	def draw_bidder_ID(self):
+		bidder_IDs = []
+		for user in self.bidder:
+			bidder_IDs.append(user)
+		return bidder_IDs
+
 	def update_bid_info(self, UserID, price):
-		if price <= self.highest_price:
-			print price, 'from', UserID, 'not higher than', self.highest_price
+		flag = 0
+		info = 0
+		if price < self.highest_price + self.gap:
+			print price, 'from', UserID, 'not higher than', self.highest_price + self.gap
 			sys.stdout.flush()
-			return False
+			flag = 1
+			info = self.highest_price + self.gap
+			return flag, info
+		elif price > self.ceiling:
+			print price, 'from', UserID, 'too high! The ceiling price is', self.ceiling
+			flag = 2
+			info = self.ceiling
+			return flag, info
 		else:
 			self.highest_price = price
 			self.highest_user = UserID
 			self.history.append(UserID + ' bid ' + str(price))
-			return True
+			flag = 0
+			info = price
+			return flag, info
 
 
 class Server():
@@ -119,18 +143,24 @@ class Server():
 
 	def deal_client_command(self, message, address):
 		fields = message.split(' ')
-		if fields[0] in ['/login', '/auctions', '/list', '/join', '/bid', '/leave',
-						 '/exit']:
+		if fields[0] in ['/login', '/auctions', '/join', '/list', '/bidder', '/bid',
+		                 '/pubmsg', '/primsg', '/leave', '/exit']:
 			if fields[0] == '/login':
 				try:
-					if fields[1] in User:
-						self.send_message('Username occupied, try another..', address)
-					else:
-						User.append(fields[1])
-						IDMapAdd[fields[1]] = address
-						AddMapID[address] = fields[1]
-						print fields[1], 'logged in from', address
+					if user_exist(address):
+						self.send_message('You have already logged in! Exit first..', address)
+						print address, ' duplicate login refused.'
 						sys.stdout.flush()
+					else:
+						if fields[1] in User:
+							self.send_message('Username occupied, try another..', address)
+						else:
+							User.append(fields[1])
+							IDMapAdd[fields[1]] = address
+							AddMapID[address] = fields[1]
+							self.send_message('Successfully logged in!', address)
+							print fields[1], 'logged in from', address
+							sys.stdout.flush()
 				except:
 					self.send_message('Invalid input! Type \'help\' for help..', address)
 
@@ -171,18 +201,49 @@ class Server():
 				except:
 					self.send_message('Invalid input! Type \'help\' for help..', address)
 
+			if fields[0] == '/bidder':
+				try:
+					room = user_map_auctions(AddMapID[address])
+					bidders = room.draw_bidder_ID()
+					self.send_message('Next are bidders in the room', address)
+					for bidder in bidders:
+						self.send_message(bidder, address)
+				except:
+					self.send_message('Enter a room first..', address)
+
 			if fields[0] == '/bid':
 				try:
 					room = user_map_auctions(AddMapID[address])
-					if room.update_bid_info(AddMapID[address], float(fields[1])):
+					flag, info = room.update_bid_info(AddMapID[address], float(fields[1]))
+					if flag == 0:
 						broadcast_message = AddMapID[address] + ' bid ' + fields[1]
 						broadcast_address = room.draw_bidder_address()
 						if len(broadcast_address) != 0:
 							self.broadcast(broadcast_message, broadcast_address)
-					else:
-						self.send_message('Your price must higher than history!', address)
+					elif flag == 1:
+						self.send_message('Price refused! Please bid higher than '+str(info), address)
+					elif flag == 2:
+						self.send_message('Price refused! You must bid below the ceiling price '+str(info), address)
 				except:
 					self.send_message('Enter a room first..', address)
+
+			if fields[0] == '/pubmsg':
+				message = ''
+				for field in fields[1:]:
+					message += field
+				room = user_map_auctions(AddMapID[address])
+				user_in_room = room.draw_bidder_address()
+				try:
+					for useraddr in user_in_room:
+						if useraddr != address:
+							self.send_message('[' + AddMapID[address] + ']:' + message, useraddr)
+				except:
+					print 'Fail to broadcast to', room.name
+					sys.stdout.flush()
+
+			if fields[0] == '/primsg':
+				pass
+				# TODO
 
 			if fields[0] == '/leave':
 				for room in AuctionRoom:
@@ -227,14 +288,19 @@ class Server():
 	def deal_server_command(self, message):
 		fields = message.split(' ')
 		if fields[0] in ['/msg', '/list', '/kickout', '/opennewauction', '/auctions',
-						 '/enter', '/close']:
+						 '/enter', '/close', '/broadcast']:
 			if fields[0] == '/msg':
-				for user in fields[2:]:
-					try:
-						self.send_message(fields[1], IDMapAdd[user])
-					except:
-						print 'Fail to send', fields[1], 'to', user
-						sys.stdout.flush()
+				message = raw_input('Input message here:(type q to quit)\n')
+				if message != 'q':
+					for user in fields[1:]:
+						try:
+							self.send_message('[Server]:' + message, IDMapAdd[user])
+						except:
+							print 'Fail to send message to', user
+							sys.stdout.flush()
+				else:
+					print 'Quitted.'
+					sys.stdout.flush()
 
 			if fields[0] == '/list':
 				print 'Next are available auction rooms:'
@@ -243,33 +309,30 @@ class Server():
 				sys.stdout.flush()
 
 			if fields[0] == '/kickout':
-				if fields[1] in User:
-					room = user_map_auctions(fields[1])
-					if room.remove_bidder(fields[1]):
-						print fields[1], 'kicked out!'
-						sys.stdout.flush()
-						self.send_message('You have been kicked out..', IDMapAdd[fields[1]])
-						broadcast_message = fields[1] + ' have been kicked out!'
-						broadcast_address = room.draw_bidder_address()
-						if len(broadcast_address) != 0:
-							self.broadcast(broadcast_message, broadcast_address)
+				for user in fields[1:]:
+					if user in User:
+						room = user_map_auctions(user)
+						if room.remove_bidder(user):
+							print user, 'kicked out!'
+							sys.stdout.flush()
+							self.send_message('You have been kicked out..', IDMapAdd[user])
+							broadcast_message = user + ' have been kicked out!'
+							broadcast_address = room.draw_bidder_address()
+							if len(broadcast_address) != 0:
+								self.broadcast(broadcast_message, broadcast_address)
 					else:
-						print fields[1], 'owns the highest price..'
+						print user, 'doesn\'t exist..'
 						sys.stdout.flush()
-				else:
-					print fields[1], 'doesn\'t exist..'
-					sys.stdout.flush()
 
 			if fields[0] == '/opennewauction':
 				try:
-					newroom = Room(fields[1], fields[2])
+					newroom = Room(fields[1], fields[2], fields[3], fields[4])
 					AuctionRoom.append(newroom)
 					print 'Successfully created room', fields[1]
 					sys.stdout.flush()
 				except:
 					print 'Invalid input.'
 					sys.stdout.flush()
-
 
 			if fields[0] == '/auctions':
 				if len(AuctionRoom) != 0:
@@ -282,6 +345,7 @@ class Server():
 
 			if fields[0] == '/enter':
 				pass
+				# TODO
 
 			if fields[0] == '/close':
 				try:
@@ -295,6 +359,23 @@ class Server():
 				except:
 					print 'No auction room named', fields[1]
 					sys.stdout.flush()
+
+			if fields[0] == '/broadcast':
+				message = raw_input('Input message here:(type q to quit)\n')
+				if message != 'q':
+					for room_name in fields[1:]:
+						try:
+							room = name_map_auctions(room_name)
+							user_in_room = room.draw_bidder_address()
+							for useraddr in user_in_room:
+								self.send_message('[Server]:' + message, useraddr)
+						except:
+							print 'Fail to broadcast to', room_name
+							sys.stdout.flush()
+				else:
+					print 'Quitted.'
+					sys.stdout.flush()
+
 		else:
 			print 'Invalid input!'
 			sys.stdout.flush()

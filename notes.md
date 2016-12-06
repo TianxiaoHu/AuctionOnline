@@ -48,16 +48,20 @@
 
 ## BUG to fix:
 
-- duplicate `/login`
-- set a ceiling price
-- `/close` no parameter
+- ~~duplicate `/login`~~
+- ~~set a ceiling price and smallest price gap~~
+- `/close` no parameter **AND SO ON**
+  - considering separate `command check` and `command execute` 
 
 ## New Function:
 
+- ~~list bidders in room(Client)~~
 - chatting room mode(Client)
-- auction room broadcasting(Server)
+  - ~~room message `/pubmsg`~~
+  - private message `/primsg`
+- ~~auction room broadcasting(Server)~~
 - restart auction(Server)
-- reject the bid(Server)
-- extend `/kickout` kickout many users at the same time(Server)
+- ~~extend `/kickout` kickout many users at the same time(Server)~~
 - Encryption of data——in case of MITM attack
+- ~~extend `/msg` and `/broadcast` : separated by space should be replaced(considering raw_input?)~~
 
