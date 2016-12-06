@@ -36,6 +36,7 @@ class Room():
 		self.name = name
 		self.bidder = []
 		self.history = []
+		self.baseprice = float(baseprice)
 		self.highest_price = float(baseprice)
 		self.highest_user = ''
 		self.ceiling = float(ceilprice)
@@ -188,8 +189,7 @@ class Server():
 					for room in AuctionRoom:
 						if fields[1] == room.name:
 							if room.add_bidder(AddMapID[address]):
-								broadcast_message = AddMapID[
-									address] + ' joined auction!'
+								broadcast_message = AddMapID[address] + ' joined auction!'
 								broadcast_address = room.draw_bidder_address()
 								if len(broadcast_address) != 0:
 									self.broadcast(broadcast_message, broadcast_address)
@@ -228,30 +228,37 @@ class Server():
 					self.send_message('Enter a room first..', address)
 
 			if fields[0] == '/pubmsg':
-				message = ''
-				for field in fields[1:]:
-					message += field
-				room = user_map_auctions(AddMapID[address])
-				user_in_room = room.draw_bidder_address()
+				message = ' '.join(fields[1:])
 				try:
-					for useraddr in user_in_room:
-						if useraddr != address:
-							self.send_message('[' + AddMapID[address] + ']:' + message, useraddr)
+					room = user_map_auctions(AddMapID[address])
+					user_in_room = room.draw_bidder_address()
+					self.broadcast('[' + AddMapID[address] + ']:' + message, user_in_room)
 				except:
-					print 'Fail to broadcast to', room.name
-					sys.stdout.flush()
+					self.send_message('Enter a room first..', address)
 
 			if fields[0] == '/primsg':
-				pass
-				# TODO
+				sep = fields.index('|')
+				message = ' '.join(fields[sep+1:])
+				try:
+					room = user_map_auctions(AddMapID[address])
+					user_in_room = room.draw_bidder_address()
+					for user in fields[1:sep]:
+						if user in IDMapAdd.keys():
+							if IDMapAdd[user] in user_in_room:
+								self.send_message('[' + AddMapID[address] + ']:' + message, IDMapAdd[user])
+							else:
+								self.send_message('No user in the room', address)
+						else:
+							self.send_message('The user may not exist, try again.', address)
+				except:
+					self.send_message('Invalid input! Type \'help\' for help..', address)
 
 			if fields[0] == '/leave':
 				for room in AuctionRoom:
 					if AddMapID[address] in room.bidder:
 						if room.remove_bidder(AddMapID[address]):
 							self.send_message('You have left..', address)
-							broadcast_message = AddMapID[
-								address] + ' has left..'
+							broadcast_message = AddMapID[address] + ' has left..'
 							broadcast_address = room.draw_bidder_address()
 							if len(broadcast_address) != 0:
 								self.broadcast(broadcast_message, broadcast_address)
@@ -288,7 +295,7 @@ class Server():
 	def deal_server_command(self, message):
 		fields = message.split(' ')
 		if fields[0] in ['/msg', '/list', '/kickout', '/opennewauction', '/auctions',
-						 '/enter', '/close', '/broadcast']:
+						 '/enter', '/close', '/broadcast', '/restart']:
 			if fields[0] == '/msg':
 				message = raw_input('Input message here:(type q to quit)\n')
 				if message != 'q':
@@ -303,10 +310,8 @@ class Server():
 					sys.stdout.flush()
 
 			if fields[0] == '/list':
-				print 'Next are available auction rooms:'
-				for room in AuctionRoom:
-					print room.name
-				sys.stdout.flush()
+				pass
+				# TODO
 
 			if fields[0] == '/kickout':
 				for user in fields[1:]:
@@ -367,13 +372,23 @@ class Server():
 						try:
 							room = name_map_auctions(room_name)
 							user_in_room = room.draw_bidder_address()
-							for useraddr in user_in_room:
-								self.send_message('[Server]:' + message, useraddr)
+							self.broadcast('[Server]:' + message, user_in_room)
 						except:
 							print 'Fail to broadcast to', room_name
 							sys.stdout.flush()
 				else:
 					print 'Quitted.'
+					sys.stdout.flush()
+			if fields[0] == '/restart':
+				try:
+					close_room = name_map_auctions(fields[1])
+					close_room.history = []
+					close_room.highest_price = float(close_room.baseprice)
+					close_room.highest_user = ''
+					broadcast_message = 'Auction RESTARTED, all bid history cleared!'
+					self.broadcast(broadcast_message, close_room.draw_bidder_address())
+				except:
+					print 'No auction room named', fields[1]
 					sys.stdout.flush()
 
 		else:
