@@ -66,4 +66,16 @@
 - ~~extend `/msg` and `/broadcast` : separated by space should be replaced(considering raw_input?)~~
 - Server `enter`
 - MODIFY Server `list`
+- How to deal with ceiling price **below** current + gap?
+- Broadcasting to all users —— when open a new auction
+- finish the 'help' reminder
+- request for current aution room info(current price、baseline、ceiling、gap)
+- deal `command` without logging in **in all**
+- finish the auction and close the room
+
+  - add a timer
+- list all online users(with their room)
+- duplicate `join`
+- random generate a username
+
 
