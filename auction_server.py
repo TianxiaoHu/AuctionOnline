@@ -2,11 +2,28 @@
 import sys
 import socket
 import threading
+from Crypto.Cipher import AES
 
 global server
 global AuctionRoom, User, AddMapID, IDMapAdd
 AuctionRoom, User = [], []
 AddMapID, IDMapAdd = {}, {}
+
+padding = '\0'
+pad = lambda x: x + (16 - len(x) % 16) * padding
+unwrap = lambda x: x.replace('\0', '')
+key = '1234567890abcdef'
+mode = AES.MODE_ECB
+encryptor = AES.new(key, mode)
+decryptor = AES.new(key, mode)
+
+def AESencrypt(plaintext):
+	plaintext = pad(plaintext)
+	return encryptor.encrypt(plaintext)
+
+def AESdecrypt(ciphertext):
+	plaintext = decryptor.decrypt(ciphertext)
+	return unwrap(plaintext)
 
 def user_map_auctions(UserID):
 	for room in AuctionRoom:
@@ -111,7 +128,7 @@ class Server():
 	def __init__(self, local_port=20210):
 
 		try:
-			local_IP = socket.gethostbyname(socket.gethostname())
+			local_IP = '127.0.0.1'
 			local_address = (local_IP, local_port)
 			self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 			self.s.bind(local_address)
@@ -125,12 +142,14 @@ class Server():
 
 	def receive_message(self):
 		message, address = self.s.recvfrom(2048)
-		print "received:", message, "from", address
+		plaintext = AESdecrypt(message)
+		print "received:", plaintext, "from", address
 		sys.stdout.flush()
-		return message, address
+		return plaintext, address
 
 	def send_message(self, message, address):
-		self.s.sendto(message, address)
+		ciphertext = AESencrypt(message)
+		self.s.sendto(ciphertext, address)
 		print message, 'sent to', address
 		sys.stdout.flush()
 

@@ -62,7 +62,7 @@
 - ~~auction room broadcasting(Server)~~
 - ~~restart auction(Server)~~
 - ~~extend `/kickout` kickout many users at the same time(Server)~~
-- Encryption of data——in case of MITM attack
+- ~~Encryption of data——in case of MITM attack~~
 - ~~extend `/msg` and `/broadcast` : separated by space should be replaced(considering raw_input?)~~
 - Server `enter`
 - MODIFY Server `list`
