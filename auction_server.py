@@ -32,6 +32,7 @@ def user_map_auctions(UserID):
 	else:
 		print UserID, 'not in any room'
 		sys.stdout.flush()
+		return False
 
 def name_map_auctions(auction_name):
 	for room in AuctionRoom:
@@ -40,6 +41,7 @@ def name_map_auctions(auction_name):
 	else:
 		print auction_name, 'not exist.'
 		sys.stdout.flush()
+		return False
 
 def user_exist(UserAddr):
 	if UserAddr in IDMapAdd.values():
@@ -49,17 +51,21 @@ def user_exist(UserAddr):
 
 class Room():
 
-	def __init__(self, name, baseprice, ceilprice, gap):
+	def __init__(self, name, baseprice, gap):
 		self.name = name
 		self.bidder = []
 		self.history = []
-		self.baseprice = float(baseprice)
+		self.base_price = float(baseprice)
 		self.highest_price = float(baseprice)
 		self.highest_user = ''
-		self.ceiling = float(ceilprice)
 		self.gap = float(gap)
+		self.closed = False
 
 	def add_bidder(self, bidder_ID):
+		if self.closed:
+			print 'Room have been closed'
+			sys.stdout.flush()
+			return False
 		if bidder_ID not in self.bidder:
 			self.bidder.append(bidder_ID)
 			print bidder_ID, 'successfully joined', self.name
@@ -76,7 +82,7 @@ class Room():
 			sys.stdout.flush()
 			return False
 		else:
-			if self.highest_user != '' and bidder_ID == self.highest_user:
+			if self.highest_user != '' and self.closed == False and bidder_ID == self.highest_user:
 				print bidder_ID, 'bid the highest price!'
 				return False
 			else:
@@ -108,11 +114,6 @@ class Room():
 			sys.stdout.flush()
 			flag = 1
 			info = self.highest_price + self.gap
-			return flag, info
-		elif price > self.ceiling:
-			print price, 'from', UserID, 'too high! The ceiling price is', self.ceiling
-			flag = 2
-			info = self.ceiling
 			return flag, info
 		else:
 			self.highest_price = price
@@ -190,33 +191,38 @@ class Server():
 					self.send_message(room.name, address)
 
 			if fields[0] == '/list':
-				try:
-					room = user_map_auctions(AddMapID[address])
-					roomhistory = room.draw_bid_history()
-					if len(roomhistory) == 0:
-						self.send_message('No bid history..', address)
-					else:
-						for bidhistory in roomhistory:
-							self.send_message(bidhistory, address)
-				except:
-					print AddMapID[address], 'haven\'t join a room..'
-					sys.stdout.flush()
-					self.send_message('You must join a room first..', address)
+				# try:
+				room = user_map_auctions(AddMapID[address])
+				roomhistory = room.draw_bid_history()
+				room_msg = 'Base price is ' + str(room.base_price) + ', smallest gap is ' + str(room.gap)
+				self.send_message(room_msg, address)
+				if len(roomhistory) == 0:
+					self.send_message('No bid history..', address)
+				else:
+					for bidhistory in roomhistory:
+						self.send_message(bidhistory, address)
+				# except:
+				# 	print AddMapID[address], 'haven\'t join a room..'
+				# 	sys.stdout.flush()
+				# 	self.send_message('You must join a room first..', address)
 
 			if fields[0] == '/join':
 				try:
-					for room in AuctionRoom:
-						if fields[1] == room.name:
+					if user_map_auctions(AddMapID[address]) == False:
+						room = name_map_auctions(fields[1])
+						if room != False:
 							if room.add_bidder(AddMapID[address]):
 								broadcast_message = AddMapID[address] + ' joined auction!'
 								broadcast_address = room.draw_bidder_address()
-								if len(broadcast_address) != 0:
-									self.broadcast(broadcast_message, broadcast_address)
+								self.broadcast(broadcast_message, broadcast_address)
+								room_msg = 'Current price is '+str(room.highest_price)+', smallest gap is '+str(room.gap)
+								self.send_message(room_msg, address)
 							else:
-								self.send_message('You have already in this room', address)
-							break
+								self.send_message('Room have been closed..try another', message)
+						else:
+							self.send_message('No this room..try another', address)
 					else:
-						self.send_message('No this room..try another', address)
+						self.send_message('You have joined an auction, leave it first', address)
 				except:
 					self.send_message('Invalid input! Type \'help\' for help..', address)
 
@@ -239,10 +245,8 @@ class Server():
 						broadcast_address = room.draw_bidder_address()
 						if len(broadcast_address) != 0:
 							self.broadcast(broadcast_message, broadcast_address)
-					elif flag == 1:
+					else :
 						self.send_message('Price refused! Please bid higher than '+str(info), address)
-					elif flag == 2:
-						self.send_message('Price refused! You must bid below the ceiling price '+str(info), address)
 				except:
 					self.send_message('Enter a room first..', address)
 
@@ -314,7 +318,7 @@ class Server():
 	def deal_server_command(self, message):
 		fields = message.split(' ')
 		if fields[0] in ['/msg', '/list', '/kickout', '/opennewauction', '/auctions',
-						 '/enter', '/close', '/broadcast', '/restart']:
+						 '/enter', '/finish', '/close', '/broadcast', '/restart']:
 			if fields[0] == '/msg':
 				message = raw_input('Input message here:(type q to quit)\n')
 				if message != 'q':
@@ -350,9 +354,10 @@ class Server():
 
 			if fields[0] == '/opennewauction':
 				try:
-					newroom = Room(fields[1], fields[2], fields[3], fields[4])
+					newroom = Room(fields[1], fields[2], fields[3])
 					AuctionRoom.append(newroom)
 					print 'Successfully created room', fields[1]
+					self.broadcast('New room created: '+fields[1], IDMapAdd.values())
 					sys.stdout.flush()
 				except:
 					print 'Invalid input.'
@@ -371,6 +376,16 @@ class Server():
 				pass
 				# TODO
 
+			if fields[0] == '/finish':
+				try:
+					close_room = name_map_auctions(fields[1])
+					close_room.closed = True
+					print 'Successfully closed'
+					sys.stdout.flush()
+				except:
+					print 'No auction room fit input'
+					sys.stdout.flush()
+
 			if fields[0] == '/close':
 				try:
 					close_room = name_map_auctions(fields[1])
@@ -381,7 +396,7 @@ class Server():
 						AuctionRoom.remove(close_room)
 						del close_room
 				except:
-					print 'No auction room named', fields[1]
+					print 'No auction room fit input'
 					sys.stdout.flush()
 
 			if fields[0] == '/broadcast':
@@ -402,7 +417,7 @@ class Server():
 				try:
 					close_room = name_map_auctions(fields[1])
 					close_room.history = []
-					close_room.highest_price = float(close_room.baseprice)
+					close_room.highest_price = float(close_room.base_price)
 					close_room.highest_user = ''
 					broadcast_message = 'Auction RESTARTED, all bid history cleared!'
 					self.broadcast(broadcast_message, close_room.draw_bidder_address())
