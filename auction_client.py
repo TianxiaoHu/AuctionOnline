@@ -1,7 +1,7 @@
-import sys
 import socket
 import threading
 import random
+from Tkinter import *
 from Crypto.Cipher import AES
 
 global client
@@ -27,6 +27,28 @@ def AESdecrypt(ciphertext):
 def show_tips():
 	pass
 
+global window
+
+class MainGui():
+	def __init__(self):
+		self.root = Tk()
+		self.root.geometry('400x250+150+200')
+		self.root.title('AuctionOnline-ClientMode')
+
+		self.slogan = Label(self.root, text='Input your command here:')
+		self.slogan.pack()
+		self.command_entry = Entry(self.root)
+		self.command_entry.pack()
+		self.send_button = Button(self.root, text='Send',
+								  command=lambda: client.send_message(self.command_entry.get()))
+		self.send_button.pack()
+
+		self.server_message = Text(self.root, height=7, width=40)
+		self.server_message.pack()
+
+window = MainGui()
+
+
 class Client():
 	def __init__(self, server_IP, server_port):
 		try:
@@ -35,24 +57,21 @@ class Client():
 			client_port = random.randint(10000, 65535)
 			self.s.bind((client_IP, client_port))
 			self.server_address = (server_IP, server_port)
-			print 'Client initialized successfully!'
-			sys.stdout.flush()
+			window.server_message.insert(END, 'Client initialized successfully!\n')
 		except:
-			print 'Initialization failed, restart the client...'
-			sys.stdout.flush()
 			sys.exit()
 
 	def receive_message(self):
 		message, client_address = self.s.recvfrom(2048)
 		plaintext = AESdecrypt(message)
-		print plaintext
+		window.server_message.insert(1.0, plaintext + '\n')
 		sys.stdout.flush()
 
 	def send_message(self, message):
 		ciphertext = AESencrypt(message)
 		self.s.sendto(ciphertext, self.server_address)
-		print message, 'sent to', self.server_address
 		sys.stdout.flush()
+		window.command_entry.delete(0, END)
 
 
 class ListenerThread(threading.Thread):
@@ -61,36 +80,11 @@ class ListenerThread(threading.Thread):
 		while True:
 			client.receive_message()
 
-class SpeakerThread(threading.Thread):
-
-	def run(self):
-		while True:
-			data = raw_input()
-			if data == 'help':
-				show_tips()
-			elif data == '/pubmsg':
-				msg = raw_input('Input message here:(type q to quit)\n')
-				if msg != 'q':
-					client.send_message('/pubmsg ' + msg)
-				else:
-					print 'Quitted'
-					sys.stdout.flush()
-			elif data[:7] == '/primsg':
-				msg = raw_input('Input message here:(type q to quit)\n')
-				if msg != 'q':
-					client.send_message(data + ' | ' + msg)
-				else:
-					print 'Quitted'
-					sys.stdout.flush()
-
-			else:
-				client.send_message(data)
 
 client = Client(ServerIP, ServerPort)
 
 
 if __name__ == '__main__':
 	listener_thread = ListenerThread()
-	speaker_thread = SpeakerThread()
 	listener_thread.start()
-	speaker_thread.start()
+	window.root.mainloop()
