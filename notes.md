@@ -50,8 +50,7 @@
 
 - ~~duplicate `/login`~~
 - ~~set a ceiling price and smallest price gap~~
-- `/close` no parameter **AND SO ON**
-  - considering separate `command check` and `command execute` 
+- ~~`/close` no parameter **AND SO ON**~~ 
 
 ## New Function:
 
@@ -64,16 +63,16 @@
 - ~~extend `/kickout` kickout many users at the same time(Server)~~
 - ~~Encryption of data——in case of MITM attack~~
 - ~~extend `/msg` and `/broadcast` : separated by space should be replaced(considering raw_input?)~~
-- Server `enter`
-- MODIFY Server `list`
+- ~~Server `enter`~~
+- ~~MODIFY Server `list`~~
 - ~~How to deal with ceiling price **below** current + gap?~~
 - ~~Broadcasting to all users —— when open a new auction~~
 - > finish the 'help' reminder
 - ~~request for current auction room info(current price、baseline、gap)~~
 - > deal `command` without logging in **in all**(GUI)
-- finish the auction and close the room
+- ~~finish the auction and close the room~~
 
-- list all online users(with their room)
+- ~~list all online users(with their room)~~
 - ~~duplicate `join`~~
 - > random generate a username(GUI)
 
