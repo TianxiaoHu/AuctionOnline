@@ -67,13 +67,11 @@
 - ~~MODIFY Server `list`~~
 - ~~How to deal with ceiling price **below** current + gap?~~
 - ~~Broadcasting to all users —— when open a new auction~~
-- > finish the 'help' reminder
+- ~~finish the 'help' reminder~~
 - ~~request for current auction room info(current price、baseline、gap)~~
-- > deal `command` without logging in **in all**(GUI)
 - ~~finish the auction and close the room~~
 
 - ~~list all online users(with their room)~~
 - ~~duplicate `join`~~
-- > random generate a username(GUI)
 
 

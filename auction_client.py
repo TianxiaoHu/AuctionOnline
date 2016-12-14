@@ -1,7 +1,9 @@
+# -*- coding:utf-8 -*-
 import socket
 import threading
 import random
 from Tkinter import *
+import tkMessageBox
 from Crypto.Cipher import AES
 
 global client
@@ -24,9 +26,6 @@ def AESdecrypt(ciphertext):
 	plaintext = decryptor.decrypt(ciphertext)
 	return unwrap(plaintext)
 
-def show_tips():
-	pass
-
 global window
 
 class MainGui():
@@ -34,17 +33,46 @@ class MainGui():
 		self.root = Tk()
 		self.root.geometry('400x250+150+200')
 		self.root.title('AuctionOnline-ClientMode')
+		# self.root.iconbitmap('icon.ico')
+
+		self.help_button = Button(self.root, text='Help', command=self.show_tips)
+		self.help_button.pack()
 
 		self.slogan = Label(self.root, text='Input your command here:')
 		self.slogan.pack()
+
 		self.command_entry = Entry(self.root)
 		self.command_entry.pack()
+
 		self.send_button = Button(self.root, text='Send',
 								  command=lambda: client.send_message(self.command_entry.get()))
 		self.send_button.pack()
 
 		self.server_message = Text(self.root, height=7, width=40)
 		self.server_message.pack()
+
+		self.exit_button = Button(self.root, text='Exit', command=lambda: sys.exit())
+		self.exit_button.pack()
+
+	def show_tips(self):
+
+		tips = r'''
+Next are available commands:
+- /login username
+- /auctions
+- /join auctionname
+- /list
+- /bidder
+- /bid price
+- /pubmsg message
+- /primsg username1 username2 | message
+- /leave
+- /exit
+
+Author: TianxiaoHu
+Version: 1.0'''
+		tkMessageBox.showinfo('AuctionOnline-help', tips)
+
 
 window = MainGui()
 
@@ -64,15 +92,12 @@ class Client():
 	def receive_message(self):
 		message, client_address = self.s.recvfrom(2048)
 		plaintext = AESdecrypt(message)
-		window.server_message.insert(1.0, plaintext + '\n')
-		sys.stdout.flush()
+		window.server_message.insert(1.0, plaintext + '\n\n')
 
 	def send_message(self, message):
 		ciphertext = AESencrypt(message)
 		self.s.sendto(ciphertext, self.server_address)
-		sys.stdout.flush()
 		window.command_entry.delete(0, END)
-
 
 class ListenerThread(threading.Thread):
 
@@ -86,5 +111,6 @@ client = Client(ServerIP, ServerPort)
 
 if __name__ == '__main__':
 	listener_thread = ListenerThread()
+	listener_thread.setDaemon(True)
 	listener_thread.start()
 	window.root.mainloop()
