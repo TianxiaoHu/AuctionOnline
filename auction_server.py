@@ -34,7 +34,6 @@ class MainGui():
 		self.root = Tk()
 		self.root.geometry('400x550+150+100')
 		self.root.title('AuctionOnline-ServerMode')
-		# self.root.iconbitmap('icon.ico')
 
 		self.help_button = Button(self.root, text='Help', command=self.show_tips)
 		self.help_button.pack()
@@ -109,7 +108,6 @@ def user_exist(UserAddr):
 		return False
 
 class Room():
-
 	def __init__(self, name, baseprice, gap):
 		self.name = name
 		self.bidder = []
@@ -175,9 +173,7 @@ class Room():
 
 
 class Server():
-
 	def __init__(self, local_port=20210):
-
 		try:
 			local_IP = '127.0.0.1'
 			local_address = (local_IP, local_port)
@@ -226,7 +222,7 @@ class Server():
 							self.send_message(fields[1] + ' successfully logged in!', address)
 							window.log_message.insert(1.0, str(fields[1]) + ' logged in from ' + str(address) + '\n')
 				except:
-					self.send_message('Invalid input! Type \'help\' for help..', address)
+					self.send_message('Invalid input!', address)
 
 			if fields[0] == '/auctions':
 				for room in AuctionRoom:
@@ -265,7 +261,7 @@ class Server():
 					else:
 						self.send_message('You have joined an auction, leave it first', address)
 				except:
-					self.send_message('Invalid input! Type \'help\' for help..', address)
+					self.send_message('Invalid input!', address)
 
 			if fields[0] == '/bidder':
 				try:
@@ -303,7 +299,7 @@ class Server():
 					except:
 						self.send_message('Enter a room first..', address)
 				except:
-					self.send_message('Invalid input! Type \'help\' for help..', address)
+					self.send_message('Invalid input!', address)
 
 			if fields[0] == '/primsg':
 				try:
@@ -323,7 +319,7 @@ class Server():
 					else:
 						self.send_message('Join a room first', address)
 				except:
-					self.send_message('Invalid input! Type \'help\' for help..', address)
+					self.send_message('Invalid input!', address)
 
 			if fields[0] == '/leave':
 				for room in AuctionRoom:
@@ -360,7 +356,7 @@ class Server():
 					AddMapID.pop(address)
 
 		else:
-			self.send_message('Invalid input! Type \'help\' for help..', address)
+			self.send_message('Invalid input!', address)
 
 	def deal_server_command(self, message):
 		window.command_entry.delete(0, END)
@@ -390,8 +386,8 @@ class Server():
 						window.feedback_message.insert(1.0, user + '\t' + str(IDMapAdd[user]) + '\n')
 					window.feedback_message.insert(1.0, 'Next are bidders:\n')
 					window.feedback_message.insert(1.0, 'Highest price owner:' + room.highest_user + '\n')
-					window.feedback_message.insert(1.0, 'Current price:' +  room.highest_price + '\n')
-					window.feedback_message.insert(1.0, 'Base price:' + str(room.base_price) + ' Gap:', str(room.gap) + '\n')
+					window.feedback_message.insert(1.0, 'Current price:' +  str(room.highest_price) + '\n')
+					window.feedback_message.insert(1.0, 'Base price:' + str(room.base_price) + ' Gap:' +  str(room.gap) + '\n')
 					window.feedback_message.insert(1.0, '-- Room ' + room.name + ' Summary --\n')
 				except:
 					window.error_label['text'] = 'No auction room fits input'
@@ -505,7 +501,6 @@ class ListenerThread(threading.Thread):
 		while True:
 			data, address = server.receive_message()
 			server.deal_client_command(data, address)
-
 
 server = Server()
 

@@ -33,7 +33,6 @@ class MainGui():
 		self.root = Tk()
 		self.root.geometry('400x250+150+200')
 		self.root.title('AuctionOnline-ClientMode')
-		# self.root.iconbitmap('icon.ico')
 
 		self.help_button = Button(self.root, text='Help', command=self.show_tips)
 		self.help_button.pack()
@@ -92,7 +91,7 @@ class Client():
 	def receive_message(self):
 		message, client_address = self.s.recvfrom(2048)
 		plaintext = AESdecrypt(message)
-		window.server_message.insert(1.0, plaintext + '\n\n')
+		window.server_message.insert(1.0, plaintext + '\n')
 
 	def send_message(self, message):
 		ciphertext = AESencrypt(message)
@@ -100,14 +99,11 @@ class Client():
 		window.command_entry.delete(0, END)
 
 class ListenerThread(threading.Thread):
-
 	def run(self):
 		while True:
 			client.receive_message()
 
-
 client = Client(ServerIP, ServerPort)
-
 
 if __name__ == '__main__':
 	listener_thread = ListenerThread()
