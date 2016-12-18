@@ -61,7 +61,7 @@ Next are available commands:
 - /auctions
 - /join auctionname
 - /list
-- /bidder
+- /bidders
 - /bid price
 - /pubmsg message
 - /primsg username1 username2 | message

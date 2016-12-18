@@ -73,13 +73,13 @@ Next are available commands:
 - /auctions
 - /opennewauction auctionname base gap
 - /users
-- /list
+- /list auctionname
 - /msg username1 username2 | message
-- /broadcast roomname message
+- /broadcast auctionname message
 - /kickout username1 username2
-- /finish roomname
-- /close roomname
-- /restart roomname
+- /finish auctionname
+- /close auctionname
+- /restart auctionname
 
 Author: TianxiaoHu
 Version: 1.0'''
@@ -205,7 +205,7 @@ class Server():
 
 	def deal_client_command(self, message, address):
 		fields = message.split(' ')
-		if fields[0] in ['/login', '/auctions', '/join', '/list', '/bidder', '/bid',
+		if fields[0] in ['/login', '/auctions', '/join', '/list', '/bidders', '/bid',
 		                 '/pubmsg', '/primsg', '/leave', '/exit']:
 			if fields[0] == '/login':
 				try:
@@ -263,7 +263,7 @@ class Server():
 				except:
 					self.send_message('Invalid input!', address)
 
-			if fields[0] == '/bidder':
+			if fields[0] == '/bidders':
 				try:
 					room = user_map_auctions(AddMapID[address])
 					bidders = room.draw_bidder_ID()
@@ -271,7 +271,7 @@ class Server():
 						self.send_message(bidder, address)
 					self.send_message('Next are bidders in the room', address)
 				except:
-					self.send_message('Enter a room first..', address)
+					self.send_message('You must join a room first..', address)
 
 			if fields[0] == '/bid':
 				try:
@@ -287,7 +287,7 @@ class Server():
 					else:
 						self.send_message('Auction closed', address)
 				except:
-					self.send_message('Enter a room first..', address)
+					self.send_message('You must join a room first..', address)
 
 			if fields[0] == '/pubmsg':
 				try:
@@ -297,7 +297,7 @@ class Server():
 						user_in_room = room.draw_bidder_address()
 						self.broadcast('[' + AddMapID[address] + ']:' + message, user_in_room)
 					except:
-						self.send_message('Enter a room first..', address)
+						self.send_message('You must join a room first..', address)
 				except:
 					self.send_message('Invalid input!', address)
 
@@ -317,43 +317,41 @@ class Server():
 							else:
 								self.send_message('The user ' + user + ' may not exist.. try again', address)
 					else:
-						self.send_message('Join a room first', address)
+						self.send_message('You must join a room first..', address)
 				except:
 					self.send_message('Invalid input!', address)
 
 			if fields[0] == '/leave':
-				for room in AuctionRoom:
-					if AddMapID[address] in room.bidder:
-						if room.remove_bidder(AddMapID[address]):
-							self.send_message('You have left..', address)
-							broadcast_message = AddMapID[address] + ' has left..'
-							broadcast_address = room.draw_bidder_address()
-							if len(broadcast_address) != 0:
-								self.broadcast(broadcast_message, broadcast_address)
-						else:
-							self.send_message('You can\'t leave now!', address)
-						break
+				room = user_map_auctions(AddMapID[address])
+				if room != False:
+					if room.remove_bidder(AddMapID[address]):
+						self.send_message('You have left..', address)
+						broadcast_message = AddMapID[address] + ' has left..'
+						broadcast_address = room.draw_bidder_address()
+						if len(broadcast_address) != 0:
+							self.broadcast(broadcast_message, broadcast_address)
+					else:
+						self.send_message('You can\'t leave now!', address)
 				else:
-					self.send_message('Enter a room first..', address)
+					self.send_message('You must join a room first..', address)
 
 			if fields[0] == '/exit':
-				for room in AuctionRoom:
-					if AddMapID[address] in room.bidder:
-						if room.remove_bidder(AddMapID[address]):
-							self.send_message('You have left..', address)
-							broadcast_message = AddMapID[address] + ' has left..'
-							broadcast_address = room.draw_bidder_address()
-							if len(broadcast_address) != 0:
-								self.broadcast(broadcast_message, broadcast_address)
-						else:
-							self.send_message('You can\'t leave now!', address)
-							break
-				else:
-					self.send_message('Successfully exit from AuctionOnline..', address)
-					window.feedback_message.insert(1.0, str(AddMapID[address]) + ' exit\n')
-					User.remove(AddMapID[address])
-					IDMapAdd.pop(AddMapID[address])
-					AddMapID.pop(address)
+				room = user_map_auctions(AddMapID[address])
+				if room != False:
+					if room.remove_bidder(AddMapID[address]):
+						self.send_message('You have left..', address)
+						broadcast_message = AddMapID[address] + ' has left..'
+						broadcast_address = room.draw_bidder_address()
+						if len(broadcast_address) != 0:
+							self.broadcast(broadcast_message, broadcast_address)
+					else:
+						self.send_message('You can\'t leave now!', address)
+						return
+				self.send_message('Successfully exit from AuctionOnline..', address)
+				window.feedback_message.insert(1.0, str(AddMapID[address]) + ' exit\n')
+				User.remove(AddMapID[address])
+				IDMapAdd.pop(AddMapID[address])
+				AddMapID.pop(address)
 
 		else:
 			self.send_message('Invalid input!', address)
@@ -408,7 +406,7 @@ class Server():
 							else:
 								window.feedback_message.insert(1.0, user + ' not in any room\n')
 						else:
-							window.feedback_message.insert(1.0, str(user) + ' doesn\'t exist..\n')
+							window.feedback_message.insert(1.0, str(user) + ' doesn\'t exist\n')
 				except:
 					window.error_label['text'] = 'Invalid input.'
 
