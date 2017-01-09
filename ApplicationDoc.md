@@ -298,10 +298,9 @@ class Server():
                          '/leave', '/exit']:
 			if fields[0] == '/login':
 				pass
-
 			if fields[0] == '/auctions':
 				... ...
-                
+           
 		else:
 			self.send_message('Invalid input!', address)
 
@@ -314,7 +313,6 @@ class Server():
                          '/finish', '/close', '/broadcast']:
 			if fields[0] == '/msg':
 				pass
-
 			if fields[0] == '/list':
 				... ...
                  
